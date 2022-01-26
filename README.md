@@ -2,7 +2,8 @@
 
 Task   
 
-Have to look at some RNA-Seq data that have been generated from Trypanosoma brucei brucei. 
+Have to look at some RNA-Seq data that have been generated from Trypanosoma brucei brucei: https://www.researchgate.net/publication/8077434_The_developmental_cell_biology_of_Trypanosoma_brucei
+
 The research lab is particularly interested in whether there are any differences in gene expression levels in two different life cycle stages: "slender" and "stumpy". 
 There are three biological replicates for each of the two conditions, and the technology used was paired-end sequencing.  
 
