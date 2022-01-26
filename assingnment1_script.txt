@@ -1,0 +1,92 @@
+#!/bin/bash
+
+#name the directories which contain the folders required for the script to run
+SOURCE_DIR=/localdisk/data/BPSM/Assignment1/fastq
+SOURCE_DIR2=/localdisk/data/BPSM/Assignment1/Tbb_genome
+SOURCE_DIR3=/localdisk/data/BPSM/Assignment1
+
+#the full directory name of the script no matter where it is being called from.
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+#assign a directory where the script will run from where it is being called
+PROJECT_DIR=$SCRIPT_DIR/assignment_1
+if [ -d "$PROJECT_DIR" ]; then rm -Rf $PROJECT_DIR; fi
+
+#make the directory as named above
+mkdir $PROJECT_DIR
+
+#copy the direcotories and folders to the new direcotry where the script will run
+cp $SOURCE_DIR/* $PROJECT_DIR
+cp $SOURCE_DIR2/* $PROJECT_DIR
+cp $SOURCE_DIR3/* $PROJECT_DIR
+
+#change the directory to the new direcotry named assignment_1
+cd $PROJECT_DIR
+
+#a while loop to perform fastqc to the duplicated raw sequence data of each of the sapmples found in the fqfiles looping over columns 2 and 3 for all 6 samples
+while read line; do
+    set -- $line
+    FILE_1=$PROJECT_DIR/$2
+    FILE_2=$PROJECT_DIR/$3
+    
+    filename_1=$(basename -- "$FILE_1")
+    filename_1="${filename_1%.*}"
+    base_1="${filename_1%.*}"
+
+    filename_2=$(basename -- "$FILE_2")
+    filename_2="${filename_2%.*}"
+    base_2="${filename_2%.*}"
+
+    fastqc $FILE_1
+    fastqc $FILE_2
+    fast_qc_1=$PROJECT_DIR/$base_1"_fastqc.zip"
+    fast_qc_2=$PROJECT_DIR/$base_2"_fastqc.zip"
+#unzip the fastqc files in order to peform the quality check    
+    unzip $fast_qc_1
+    unzip $fast_qc_2
+    unzipped_dir_1=$PROJECT_DIR/$base_1"_fastqc"
+    unzipped_dir_2=$PROJECT_DIR/$base_2"_fastqc"	
+#asses the numbers and quality of the raw sequence data by displaying the summary.txt file in each fastqc folder
+    cat $unzipped_dir_1/summary.txt
+    cat $unzipped_dir_2/summary.txt
+        
+done <$PROJECT_DIR/fqfiles
+
+#unzip the fasta.gz file of the reference database 
+gunzip Tb927_genome.fasta.gz
+
+#convert the fasta file to bowtie in order to be used to align the read pairs
+bowtie2-build Tb927_genome.fasta Tb927_genome.bowtie
+
+#a second while loop for the alighment and the counts coverage data
+while read line; do
+    set -- $line
+    FILE_1=$PROJECT_DIR/$2
+    FILE_2=$PROJECT_DIR/$3
+    
+    filename_1=$(basename -- "$FILE_1")
+    filename_1="${filename_1%.*}"
+    base_1="${filename_1%.*}"
+
+    filename_2=$(basename -- "$FILE_2")
+    filename_2="${filename_2%.*}"
+    base_2="${filename_2%.*}"
+#bowtie2 programme with improved performance parameter in order to align the read pairs to the Trypanosoma brucei brucei genome sequence with output in SAM format
+
+    bowtie2 -p23 -x Tb927_genome.bowtie -1 $FILE_1 -2 $FILE_2 -S $base_1.sam;
+    
+#samtools used to convert the alignment data from SAM format to BAM 
+    samtools view -S -b "$base_1.sam" > "$base_1.bam"
+
+#samtools to sort the alignment BAM data     
+    samtools sort "$base_1.bam" > "$base_1.sorted.bam"
+
+#bedtools to convert the BAM sorted data to BED format  
+    bedtools bamtobed -i "$base_1.sorted.bam" > "$base_1.sorted.bed"
+
+#use the bedtools genomecov option with the give bedfile that contains the information about the gene locations in the genome and the sorted BED align data generated to generate counts coverage data
+    bedtools genomecov -i "$base_1.sorted.bed" -g Tbbgenes.bed > "$base_1.coverage.bed"
+
+done <$PROJECT_DIR/fqfiles
+
+#all these instuctions were done in the new directory while processing information from the fqfiles
